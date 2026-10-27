@@ -82,6 +82,12 @@ class ExtractionResult:
     def text_pages(self) -> list[PageContent]:
         return [p for p in self.pages if p.status == "ok"]
 
+    @property
+    def text_hash(self) -> str | None:
+        """Hash of the normalised extracted text: identifies the same document saved as different bytes."""
+        text = " ".join(" ".join(p.text.split()) for p in self.pages).lower()
+        return hashlib.sha256(text.encode("utf-8")).hexdigest() if text.strip() else None
+
 
 def file_hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
@@ -147,7 +153,7 @@ def extract_pdf(data: bytes, ingestion: IngestionSettings, ocr: OCRSettings) -> 
         if doc.needs_pass and not doc.authenticate(""):
             raise PDFProcessingError("encrypted", "The PDF is password-protected and cannot be processed.")
         if doc.page_count == 0:
-            raise PDFProcessingError("empty", "The PDF contains no pages.")
+            raise PDFProcessingError("empty", "The PDF contains no pages (it may be empty or corrupted).")
 
         raw_pages: list[list[tuple[str, float, bool]]] = []
         sources, labels, errors = [], [], []

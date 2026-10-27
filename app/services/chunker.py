@@ -94,18 +94,17 @@ def _build_units(pages: list[PageContent], settings: ChunkingSettings, count: To
 
 
 def _make_chunk(index: int, units: list[_Unit], count: TokenCounter) -> Chunk:
-    parts, spans, pos = [], [], 0
-    for unit in units:
-        if parts:
-            pos += 1  # joining space
-        start = pos
-        parts.append(unit.text)
-        pos += len(unit.text)
+    text, spans = "", []
+    for i, unit in enumerate(units):
+        if i:
+            # headings stay on their own line so they are never glued to a sentence
+            text += "\n" if unit.is_heading or units[i - 1].is_heading else " "
+        start = len(text)
+        text += unit.text
         if spans and spans[-1][0] == unit.page:
-            spans[-1] = (unit.page, spans[-1][1], pos)
+            spans[-1] = (unit.page, spans[-1][1], len(text))
         else:
-            spans.append((unit.page, start, pos))
-    text = " ".join(parts)
+            spans.append((unit.page, start, len(text)))
     section = next((u.section for u in reversed(units) if u.section), None)
     first_section = next((u.section for u in units if not u.is_heading), section)
     return Chunk(

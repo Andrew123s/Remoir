@@ -17,7 +17,7 @@ from app.schemas import (
     SearchRequest,
     SearchResponse,
 )
-from app.services.rag_pipeline import passage_to_dict
+from app.services.rag_pipeline import cited_documents, passage_to_dict
 
 router = APIRouter(tags=["chat"], dependencies=[Depends(require_api_key)])
 CONV_ID = Path(pattern=r"^[a-f0-9]{32}$")
@@ -74,7 +74,7 @@ def ask(req: AskRequest, c: Container = Depends(get_container)):
         strategy=opts.strategy if opts else None, rerank=opts.rerank if opts else None,
     )
     c.store.add_turn(conversation_id, "user", req.question, scope)
-    c.store.add_turn(conversation_id, "assistant", result.answer, list(dict.fromkeys(s["document_id"] for s in result.sources)))
+    c.store.add_turn(conversation_id, "assistant", result.answer, cited_documents(result.sources))
 
     report = result.citation_report
     grounding = None

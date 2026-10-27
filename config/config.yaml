@@ -66,6 +66,10 @@ llm:
   temperature: 0.1
   max_tokens: 700
   timeout_s: 120
+  # Extractive provider: minimum sentence relevance, and the fraction of the best
+  # sentence's score a sentence needs to be quoted (chosen by the evaluation sweep).
+  extractive_min_score: 0.35
+  extractive_relative_floor: 0.8
 
 conversation:
   max_turns: 6

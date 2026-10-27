@@ -142,3 +142,18 @@ def test_near_duplicate_passages_suppressed(container):
     text = "Rainfall variability reduced maize yields by eleven percent in rain-fed districts of the region."
     kept = container.retriever._deduplicate([p(1, text), p(2, text + " Extra."), p(3, "Pollinators need hedgerows.")])
     assert [k.vector_id for k in kept] == [1, 3]
+
+
+def test_same_text_with_different_bytes_is_duplicate(indexed, tmp_path):
+    from scripts.make_fixtures import DOCUMENTS, write_text_pdf
+
+    c, ids = indexed
+    spec = dict(DOCUMENTS["rainfall_maize_study.pdf"], producer="other", title="Re-saved copy")
+    path = tmp_path / "resaved.pdf"
+    write_text_pdf(path, spec)
+    before_docs, before_vectors = len(c.store.list_documents()), c.vectors.size
+    outcome = c.ingestion.ingest_bytes("resaved.pdf", path.read_bytes())
+    assert outcome.status == "duplicate"
+    assert outcome.duplicate_of == ids["rainfall_maize_study.pdf"]
+    assert len(c.store.list_documents()) == before_docs and c.vectors.size == before_vectors
+    assert len(list((c.data_path / "uploads").iterdir())) == 3  # the re-saved file was not kept

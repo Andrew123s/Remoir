@@ -1,0 +1,6 @@
+[server]
+# Matches the backend upload limit (ingestion.max_upload_mb)
+maxUploadSize = 50
+
+[browser]
+gatherUsageStats = false

@@ -73,6 +73,8 @@ class LLMSettings(BaseModel):
     timeout_s: float = Field(120, gt=0, le=600)
     # Minimum question-sentence relevance for the extractive provider to quote a sentence.
     extractive_min_score: float = Field(0.35, ge=0, le=1)
+    # Quote only sentences scoring at least this fraction of the best sentence (chosen by evaluation sweep).
+    extractive_relative_floor: float = Field(0.8, ge=0, le=1)
 
 
 class ConversationSettings(BaseModel):

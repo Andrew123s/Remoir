@@ -228,3 +228,21 @@ def test_openai_provider_without_key(monkeypatch):
 def test_abstention_detection():
     assert is_abstention(INSUFFICIENT_EVIDENCE)
     assert not is_abstention("Rainfall reduced yields [S1].")
+
+
+def _ollama_ready(model):
+    try:
+        names = [m["name"] for m in httpx.get("http://localhost:11434/api/tags", timeout=2).json().get("models", [])]
+        return model in names
+    except Exception:
+        return False
+
+
+@pytest.mark.skipif(not _ollama_ready("llama3.2:3b"), reason="Ollama with llama3.2:3b is not running locally")
+def test_ollama_integration_answers_with_valid_citations(indexed):
+    c, _ = indexed
+    c.pipeline.provider = OllamaProvider(LLMSettings(provider="ollama", model="llama3.2:3b"))
+    result = c.pipeline.answer("What limitations did the maize rainfall study identify?")
+    assert result.status in {"answered", "insufficient_evidence"}
+    if result.citation_report:
+        assert all(s["source_id"].startswith("S") for s in result.sources)

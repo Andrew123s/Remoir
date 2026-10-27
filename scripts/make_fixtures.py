@@ -139,6 +139,37 @@ DOCUMENTS = {
             ],
         ],
     },
+    "climate_adaptation_brief.pdf": {
+        "title": "Climate Adaptation Options for Smallholder Agriculture: Policy Brief",
+        "author": "Fictional Institute for Rural Policy",
+        "creationDate": "D:20250120000000",
+        "pages": [
+            [
+                ("h", "Climate Adaptation Options for Smallholder Agriculture"),
+                ("p", NOTICE),
+                ("h", "Key messages"),
+                ("p", "Average temperatures in the fictional Savanna Belt have risen by 1.2 degrees Celsius since 1980, "
+                      "and the length of the rainy season has shortened by about nine days. These changes are the "
+                      "main evidence of climate change cited by this brief."),
+                ("p", "Large irrigation schemes are expensive, costing an estimated 9,000 dollars per hectare, and "
+                      "the brief argues that they are not cost-effective for most smallholders. Instead it recommends "
+                      "drought-tolerant seed, weather-index insurance and soil water conservation."),
+            ],
+            [
+                ("h", "Evidence base"),
+                ("p", "The recommendations draw on 23 household surveys conducted in 2023 with 1,450 farmers and on "
+                      "interviews with extension officers. Farmers who adopted drought-tolerant seed reported 18 percent "
+                      "higher yields in the dry season of 2022."),
+                ("h", "Uncertainties"),
+                ("p", "Climate projections for rainfall in the region disagree: some models project wetter conditions "
+                      "and others drier ones. Insurance uptake remains low because premiums are unaffordable for the "
+                      "poorest households, and survey responses may overstate adoption benefits."),
+                ("h", "Recommendations"),
+                ("p", "Governments should subsidise drought-tolerant seed, expand weather-index insurance and fund "
+                      "extension services. Further research should evaluate long-term impacts with randomised trials."),
+            ],
+        ],
+    },
 }
 
 

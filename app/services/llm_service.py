@@ -90,31 +90,47 @@ class ExtractiveProvider:
 
     name = "extractive"
 
-    def __init__(self, embedder: Embedder, max_sentences: int = 6, min_score: float = 0.35):
+    def __init__(self, embedder: Embedder, max_sentences: int = 5, min_score: float = 0.35, relative_floor: float = 0.8):
         self.embedder = embedder
         self.model = f"extractive/{embedder.model_id}"
         self.max_sentences = max_sentences
         self.min_score = min_score
+        self.relative_floor = relative_floor
 
     def status(self) -> dict:
         return {"provider": self.name, "available": True, "model": self.model}
 
     def generate(self, request: GenerationRequest) -> str:
         candidates: list[tuple[str, str, str]] = []  # (source_id, document filename, sentence)
-        for s in request.sources:
-            for sentence in split_sentences(s.text):
-                if len(text_utils.content_terms(sentence)) >= 4:
-                    candidates.append((s.source_id, s.filename, sentence))
+        headings: list[str] = []  # section heading preceding each candidate within its passage
+        rank_prior: list[float] = []
+        n_sources = max(len(request.sources), 1)
+        for rank, s in enumerate(request.sources):
+            heading = ""
+            for line in s.text.split("\n"):
+                for sentence in split_sentences(line):
+                    # headings and titles carry no terminal punctuation; only quote full sentences
+                    if not sentence.rstrip("\"')]").endswith((".", "!", "?")):
+                        heading = sentence
+                        continue
+                    if len(text_utils.content_terms(sentence)) >= 4:
+                        candidates.append((s.source_id, s.filename, sentence))
+                        headings.append(heading)
+                        rank_prior.append(1 - rank / n_sources)
         if not candidates:
             return INSUFFICIENT_EVIDENCE
-        qvec = self.embedder.embed_query(request.question)
+        # symmetric sentence-to-sentence similarity (no retrieval query prefix)
+        qvec = self.embedder.embed_documents([request.question])[0]
         svecs = self.embedder.embed_documents([c[2] for c in candidates])
         semantic = svecs @ qvec
         q_terms = set(text_utils.content_terms(request.question))
-        lexical = np.array([
-            len(q_terms & set(text_utils.content_terms(c[2]))) / max(len(q_terms), 1) for c in candidates
-        ])
-        scores = 0.7 * semantic + 0.3 * lexical
+
+        def overlap(text: str) -> float:
+            return len(q_terms & set(text_utils.content_terms(text))) / max(len(q_terms), 1)
+
+        lexical = np.array([overlap(c[2]) for c in candidates])
+        section = np.array([1.0 if overlap(h) > 0 else 0.0 for h in headings])
+        scores = 0.55 * semantic + 0.2 * lexical + 0.15 * section + 0.1 * np.array(rank_prior)
 
         chosen: list[int] = []
         per_doc_limit = self.max_sentences if not request.comparison else max(2, self.max_sentences // 2)
@@ -128,8 +144,10 @@ class ExtractiveProvider:
             order = list(best_per_doc.values()) + [int(i) for i in np.argsort(-scores)]
         else:
             order = [int(i) for i in np.argsort(-scores)]
+        # quote only sentences close to the best match, so weakly related passages are not cited
+        floor = max(self.min_score, float(scores.max()) * self.relative_floor)
         for i in order:
-            if len(chosen) >= self.max_sentences or i in chosen or scores[i] < self.min_score:
+            if len(chosen) >= self.max_sentences or i in chosen or (scores[i] < floor and not request.comparison) or scores[i] < self.min_score:
                 continue
             doc = candidates[i][1]
             if doc_counts.get(doc, 0) >= per_doc_limit:
@@ -240,7 +258,7 @@ class OpenAICompatibleProvider:
 def create_provider(settings: LLMSettings, embedder: Embedder) -> LLMProvider:
     provider = settings.provider.lower()
     if provider == "extractive":
-        return ExtractiveProvider(embedder, min_score=settings.extractive_min_score)
+        return ExtractiveProvider(embedder, min_score=settings.extractive_min_score, relative_floor=settings.extractive_relative_floor)
     if provider == "ollama":
         return OllamaProvider(settings)
     if provider == "openai":

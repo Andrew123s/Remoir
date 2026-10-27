@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS documents (
     page_count INTEGER DEFAULT 0,
     size_bytes INTEGER DEFAULT 0,
     content_hash TEXT NOT NULL UNIQUE,
+    text_hash TEXT,
     status TEXT NOT NULL,
     error_code TEXT,
     error TEXT,
@@ -101,6 +102,9 @@ class DocumentStore:
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._conn.execute("PRAGMA journal_mode = WAL")
         self._conn.executescript(SCHEMA)
+        columns = {r[1] for r in self._conn.execute("PRAGMA table_info(documents)")}
+        if "text_hash" not in columns:  # databases created before text-level duplicate detection
+            self._conn.execute("ALTER TABLE documents ADD COLUMN text_hash TEXT")
         self._lock = threading.RLock()
 
     def close(self) -> None:
@@ -137,6 +141,12 @@ class DocumentStore:
 
     def find_by_hash(self, content_hash: str) -> dict[str, Any] | None:
         rows = self._all("SELECT * FROM documents WHERE content_hash = ?", (content_hash,))
+        return rows[0] if rows else None
+
+    def find_by_text_hash(self, text_hash: str, exclude_id: str) -> dict[str, Any] | None:
+        rows = self._all(
+            "SELECT * FROM documents WHERE text_hash = ? AND id != ? AND status = 'indexed'", (text_hash, exclude_id)
+        )
         return rows[0] if rows else None
 
     def list_documents(self) -> list[dict[str, Any]]:

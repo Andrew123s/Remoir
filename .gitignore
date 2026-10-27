@@ -20,6 +20,7 @@ data/vector_store/*
 data/runtime_settings.json
 !data/**/.gitkeep
 evaluation/workdir/
+backups/
 *.faiss
 *.db
 *.db-wal
@@ -34,3 +35,6 @@ tests/fixtures/
 .DS_Store
 Thumbs.db
 .streamlit/secrets.toml
+
+# Local tooling
+.claude/

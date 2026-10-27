@@ -66,13 +66,23 @@ class IngestionService:
             self.store.update_document(doc_id, status="failed", error_code="extraction_error", error=msg)
             return IngestionOutcome(doc_id, "failed", msg)
 
+        text_hash = extraction.text_hash
+        if text_hash:
+            twin = self.store.find_by_text_hash(text_hash, doc_id)
+            if twin:
+                self._discard(doc_id)
+                return IngestionOutcome(
+                    twin["id"], "duplicate",
+                    f"The same text is already indexed as '{twin['filename']}' (different file bytes).",
+                    duplicate_of=twin["id"],
+                )
         meta = extraction.metadata
         pages_summary = [
             {"page": p.number, "label": p.label, "status": p.status, "chars": p.char_count, "source": p.source}
             for p in extraction.pages
         ]
         self.store.update_document(
-            doc_id, title=meta.title, title_source=meta.title_source, authors=meta.authors, year=meta.year,
+            doc_id, text_hash=text_hash, title=meta.title, title_source=meta.title_source, authors=meta.authors, year=meta.year,
             year_source=meta.year_source, page_count=meta.page_count, warnings=extraction.warnings,
             pages=pages_summary, ocr_applied=int(extraction.ocr_applied), ocr_required=int(extraction.ocr_required),
         )
@@ -128,15 +138,18 @@ class IngestionService:
         return count
 
     def delete(self, doc_id: str) -> bool:
-        doc = self.store.get_document(doc_id)
-        if not doc:
+        if not self.store.get_document(doc_id):
             return False
         self.vectors.remove(self.store.remove_chunks(doc_id))
-        self.store.delete_document(doc_id)
-        if doc.get("stored_name"):
-            path = safe_join(self.upload_dir, doc["stored_name"])
-            path.unlink(missing_ok=True)
+        self._discard(doc_id)
         return True
+
+    def _discard(self, doc_id: str) -> None:
+        """Remove the document row and its stored file."""
+        doc = self.store.get_document(doc_id)
+        self.store.delete_document(doc_id)
+        if doc and doc.get("stored_name"):
+            safe_join(self.upload_dir, doc["stored_name"]).unlink(missing_ok=True)
 
     def stored_pdf_path(self, doc_id: str) -> Path | None:
         doc = self.store.get_document(doc_id)

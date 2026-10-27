@@ -36,6 +36,31 @@ _FOLLOW_UP = re.compile(
 _SINGULAR_REFERENCE = re.compile(r"\b(it|its|this (paper|study|document|report)|the (paper|study|document|report))\b", re.IGNORECASE)
 
 
+def missing_entities(question: str, passages: list[str]) -> list[str]:
+    """Capitalised names in the question (places, organisations, people) that no passage mentions.
+
+    A question about "Kenya" answered from passages that never mention Kenya is
+    almost certainly unsupported, however similar the passages are otherwise.
+    """
+    words = re.findall(r"\b[A-Z][a-zA-Z]+(?:'s)?\b", question)
+    first = re.match(r"\W*(\w+)", question)
+    candidates = {
+        w.removesuffix("'s") for w in words
+        if not (first and w == first.group(1)) and w.lower() not in text_utils.STOPWORDS and len(w) > 2
+    }
+    corpus = " ".join(passages).lower()
+    # match on a stem so "Canadian" still matches "Canada"
+    return sorted(w for w in candidates if w.lower()[: max(4, len(w) - 3)] not in corpus)
+
+
+def cited_documents(sources: list[dict]) -> list[str]:
+    """Document ids ordered by how often the answer cites them."""
+    counts: dict[str, int] = {}
+    for s in sources:
+        counts[s["document_id"]] = counts.get(s["document_id"], 0) + 1
+    return sorted(counts, key=counts.get, reverse=True)
+
+
 @dataclass
 class EvidenceAssessment:
     sufficient: bool
@@ -128,7 +153,8 @@ class RAGPipeline:
         query = f"{last_user['content']} {question}"
         scope = None
         if _SINGULAR_REFERENCE.search(question) and last_assistant and last_assistant.get("document_ids"):
-            scope = last_assistant["document_ids"]
+            # "its limitations": the paper discussed most in the previous answer
+            scope = last_assistant["document_ids"][:1]
         return query, scope
 
     def history_for_prompt(self, history: list[dict]) -> list[dict]:
@@ -155,6 +181,12 @@ class RAGPipeline:
             return EvidenceAssessment(False, top, coverage, "Retrieved passages are not semantically close to the question.")
         if coverage < ev.min_term_coverage:
             return EvidenceAssessment(False, top, coverage, "Key terms of the question do not appear in the retrieved passages.")
+        missing = missing_entities(question, [p.text for p in passages])
+        if missing:
+            return EvidenceAssessment(
+                False, top, coverage,
+                f"The question refers to {', '.join(missing)}, which does not appear in the retrieved passages.",
+            )
         return EvidenceAssessment(True, top, coverage, "Relevant passages found.")
 
     def build_context(self, passages: list[Passage]) -> list[tuple[str, Passage]]:
