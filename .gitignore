@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Environments and secrets
+.venv/
+venv/
+.env
+*.env
+!.env.example
+
+# Private documents, local indexes and runtime state (never commit uploaded papers)
+data/uploads/*
+data/processed/*
+data/vector_store/*
+data/runtime_settings.json
+!data/**/.gitkeep
+evaluation/workdir/
+*.faiss
+*.db
+*.db-wal
+*.db-shm
+
+# Generated test fixtures are rebuilt by scripts/make_fixtures.py
+tests/fixtures/
+
+# Tools / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+.streamlit/secrets.toml
